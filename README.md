@@ -44,7 +44,9 @@ func (api *MyAPI) GetOffer(ctx context.Context, offerId string, opts ...clientx.
 
 func main() {
     ... 
-    ctx := context.TODO()
+    ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	
     resp, err := api.GetOffer(ctx, "off_1234", clientx.WithRequestHeaders(map[string][]string{
         "Authorization":    []string{"Bearer MY_ACCESS_TOKEN"}, 
     }))
@@ -57,8 +59,8 @@ There is a list of supported options from the box:
 * WithRetry - enables backoff retry mechanism
 
 ```go
-api := &PHPNoiseAPI{
-	API: clientx.NewAPI(
+api := New(
+	clientx.NewAPI(
 		clientx.WithBaseURL("https://php-noise.com"),
 		clientx.WithRateLimit(10, 2, time.Minute),
 		clientx.WithRetry(10, time.Second*3, time.Minute, clientx.ExponentalBackoff,
@@ -67,19 +69,19 @@ api := &PHPNoiseAPI{
 			},
 		),
 	),
-}
+)
 ```
 
 ### Rate limiting
 Most of the APIs have rate limits. Let's take for example the next limit: 100req/sec, so we want to stay within the limit. The rate limiter functionality supported from the box: wrapper around golang.org/x/time/rate package.
 
 ```go
-api := &PHPNoiseAPI{
-	API: clientx.NewAPI(
+api := New(
+	clientx.NewAPI(
 		clientx.WithBaseURL("https://php-noise.com"),
 		clientx.WithRateLimit(10, 2, time.Minute), // max limit: ^10, burst limit: ^2, interval: ^time.Minute
 	),
-}
+)
 ``` 
 
 If the limit is exceeded, all further call will be blocked until we gain enough capacity to perform new requests.
@@ -88,8 +90,8 @@ If the limit is exceeded, all further call will be blocked until we gain enough 
 Retry functionality can be combined with rate limiting. There are cases when you don't know the rate limiting interval. In this case you can use backoff retry mechanism. You can retry after 1 sec or you can wait for 60 minutes. The 429 (Too Many Requests) status code is an indicator when rate limit is exceeded.
 
 ```go
-api := &PHPNoiseAPI{
-	API: clientx.NewAPI(
+api := New(
+	clientx.NewAPI(
 		clientx.WithBaseURL("https://php-noise.com"),
 		clientx.WithRateLimit(10, 2, time.Minute), 
         // Parameters: max retry attempts, minimal wait time, maximal wait time, retry function (you could provide your own which is suitable for clientx.RetryFunc), trigger function (in our example we consider all 429 statuses as a tigger)
@@ -99,7 +101,7 @@ api := &PHPNoiseAPI{
 			},
 		),
 	),
-}
+)
 ```
 
 ### Request options
@@ -114,7 +116,9 @@ func (api *MyAPI) GetOffer(ctx context.Context, offerId string, opts ...clientx.
 
 func main() {
     ... 
-    ctx := context.TODO()
+    ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
     resp, err := api.GetOffer(ctx, "off_1234", clientx.WithRequestHeaders(map[string][]string{
         "Authorization":    []string{"Bearer token_test"}, 
         "X-Correlation-Id": []string{"mdj34fjhgsdb4"},
@@ -126,16 +130,8 @@ func main() {
 There are two ways to encode query parameters, one can be preferred rather than another one.
 
 ```go
-type GetOfferParam struct {
-    FilterBy string `query:"filter_by"`
-}
-
-// Variant based on WithQueryParams (when we want to encode through structure tags) 
-func (api *MyAPI) GetOffer(ctx context.Context, offerId string, param GetOfferParam, opts ...clientx.RequestOption) (*Offer, error) {
-    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
-		Get("/offers/"+offerId, opts...).
-        WithQueryParams("query", param).
-		Do(ctx)
+type GetOfferParams struct {
+    FilterBy string `url:"filter_by"`
 }
 
 func (param GetOfferParam) Encode(v url.Values) error {
@@ -143,11 +139,20 @@ func (param GetOfferParam) Encode(v url.Values) error {
     return nil
 }
 
-// Variant based on WithEncodableQueryParams when we implement clientx.ParamEncoder interface
-func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params []GetOfferParam, opts ...clientx.RequestOption) (*Offer, error) {
+
+// Variant based on WithQueryParams (when we want to encode through structure tags) 
+func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params GetOfferParams, opts ...clientx.RequestOption) (*Offer, error) {
     return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
-        WithEncodableQueryParams(clientx.NormalizeParams(params)...).
+        WithQueryParams("url", params).
+		Do(ctx)
+}
+
+// Variant based on WithEncodableQueryParams when we implement clientx.ParamEncoder interface
+func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params GetOfferParams, opts ...clientx.RequestOption) (*Offer, error) {
+    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+		Get("/offers/"+offerId, opts...).
+        WithEncodableQueryParams(params).
 		Do(ctx)
 }
 ```
