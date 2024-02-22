@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/0x9ef/clientx"
@@ -15,6 +16,15 @@ import (
 
 type PHPNoiseAPI struct {
 	*clientx.API
+	mu            *sync.Mutex
+	lastUploadURI string
+}
+
+func New(api *clientx.API) *PHPNoiseAPI {
+	return &PHPNoiseAPI{
+		API: api,
+		mu:  new(sync.Mutex),
+	}
 }
 
 type (
@@ -78,6 +88,7 @@ func (r GenerateRequest) Encode(v url.Values) error {
 	v.Set("r", strconv.Itoa(r.R))
 	v.Set("g", strconv.Itoa(r.G))
 	v.Set("b", strconv.Itoa(r.B))
+	v.Set("borderWidth", strconv.Itoa(r.BorderWidth))
 	if r.Tiles != 0 {
 		v.Set("tiles", strconv.Itoa(r.Tiles))
 	}
@@ -98,6 +109,12 @@ func (api *PHPNoiseAPI) Generate(ctx context.Context, req GenerateRequest, opts 
 	return clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
 		Get("/noise.php", opts...).
 		WithQueryParams("url", req).
+		AfterResponse(func(resp *http.Response, model *Generate) error {
+			api.mu.Lock()
+			defer api.mu.Unlock()
+			api.lastUploadURI = model.URI
+			return nil
+		}).
 		Do(ctx)
 }
 
@@ -107,8 +124,8 @@ func generate(min, max int) int {
 }
 
 func main() {
-	api := &PHPNoiseAPI{
-		API: clientx.NewAPI(
+	api := New(
+		clientx.NewAPI(
 			clientx.WithBaseURL("https://php-noise.com"),
 			clientx.WithHeader("Authorization", "Bearer MY_ACCESS_TOKEN"),
 			clientx.WithRateLimit(10, 2, time.Minute),
@@ -118,7 +135,7 @@ func main() {
 				},
 			),
 		),
-	}
+	)
 
 	resp, err := api.Generate(context.TODO(), GenerateRequest{
 		R:           generate(0, 255),
@@ -134,5 +151,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("Image URI", resp.URI)
+	fmt.Println("Current URI:", resp.URI)
+	fmt.Println("LastUploaded URI:", api.lastUploadURI)
 }
