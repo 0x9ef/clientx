@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/0x9ef/clientx"
@@ -14,24 +13,29 @@ type CatFactAPI struct {
 	*clientx.API
 }
 
-type Fact struct {
-	Fact   string `json:"fact"`
-	Length int    `json:"length"`
+func New(api *clientx.API) *CatFactAPI {
+	return &CatFactAPI{
+		API: api,
+	}
 }
 
+type (
+	EmptyRequest struct{}
+	Fact         struct {
+		Fact   string `json:"fact"`
+		Length int    `json:"length"`
+	}
+)
+
 func (api *CatFactAPI) GetFact(ctx context.Context, opts ...clientx.RequestOption) (*Fact, error) {
-	return clientx.NewRequestBuilder[struct{}, Fact](api.API).
+	return clientx.NewRequestBuilder[EmptyRequest, Fact](api.API).
 		Get("/fact", opts...).
-		AfterResponse(func(resp *http.Response, fact *Fact) error {
-			fmt.Println("Done", fact.Fact, fact.Length)
-			return nil
-		}).
 		Do(ctx)
 }
 
 func main() {
-	api := &CatFactAPI{
-		API: clientx.NewAPI(
+	api := New(
+		clientx.NewAPI(
 			clientx.WithBaseURL("https://catfact.ninja"),
 			clientx.WithRateLimit(100, 100, time.Minute),
 			clientx.WithRetry(10, time.Second*3, time.Minute, clientx.ExponentalBackoff,
@@ -40,18 +44,14 @@ func main() {
 				},
 			),
 		),
-	}
+	)
 
-	var wg sync.WaitGroup
-	for i := 0; i < 110; i++ {
-		wg.Add(1)
-		go func(wg *sync.WaitGroup) {
-			defer wg.Done()
-			_, err := api.GetFact(context.TODO())
-			if err != nil {
-				panic(err)
-			}
-		}(&wg)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
+	defer cancel()
+
+	resp, err := api.GetFact(ctx)
+	if err != nil {
+		panic(err)
 	}
-	wg.Wait()
+	fmt.Printf("Fact (len=%d): %s\n", resp.Length, resp.Fact)
 }

@@ -137,7 +137,10 @@ func main() {
 		),
 	)
 
-	resp, err := api.Generate(context.TODO(), GenerateRequest{
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+
+	resp, err := api.Generate(ctx, GenerateRequest{
 		R:           generate(0, 255),
 		G:           generate(0, 255),
 		B:           generate(0, 255),
