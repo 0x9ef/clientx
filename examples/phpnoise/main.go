@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"os"
 	"strconv"
 	"time"
 
@@ -19,22 +18,22 @@ type PHPNoiseAPI struct {
 }
 
 type (
-	GenerateParams struct {
-		R           int       `query:"r"`
-		G           int       `query:"g"`
-		B           int       `query:"b"`
-		Tiles       int       `query:"titles"`
-		TileSize    int       `query:"tileSize"`
-		BorderWidth int       `query:"borderWidth"`
-		ColorMode   ColorMode `query:"colorMode"`
-		JSON        int       `query:"json"`
-		Base64      int       `query:"base64"`
+	GenerateRequest struct {
+		R           int       `url:"r"`
+		G           int       `url:"g"`
+		B           int       `url:"b"`
+		Tiles       int       `url:"titles"`
+		TileSize    int       `url:"tileSize"`
+		BorderWidth int       `url:"borderWidth"`
+		ColorMode   ColorMode `url:"colorMode"`
+		JSON        int       `url:"json"`
+		Base64      int       `url:"base64"`
 	}
 
 	ColorMode string
 
 	Generate struct {
-		Url    string `json:"url"`
+		URI    string `json:"uri"`
 		Base64 string `json:"base64"`
 	}
 )
@@ -49,7 +48,7 @@ func (mode ColorMode) String() string {
 }
 
 // You may use go-validator package to validate through struct fields instead of custom validate function.
-func (r *GenerateParams) Validate() error {
+func (r *GenerateRequest) Validate() error {
 	if r.R > 255 {
 		return errors.New("R is exceeded >255")
 	}
@@ -75,7 +74,7 @@ func (r *GenerateParams) Validate() error {
 }
 
 // Uses when calling WithEncodableQueryParams.
-func (r GenerateParams) Encode(v url.Values) error {
+func (r GenerateRequest) Encode(v url.Values) error {
 	v.Set("r", strconv.Itoa(r.R))
 	v.Set("g", strconv.Itoa(r.G))
 	v.Set("b", strconv.Itoa(r.B))
@@ -91,18 +90,14 @@ func (r GenerateParams) Encode(v url.Values) error {
 	return nil
 }
 
-func (api *PHPNoiseAPI) Generate(ctx context.Context, param GenerateParams, opts ...clientx.RequestOption) (*Generate, error) {
-	if err := param.Validate(); err != nil {
+func (api *PHPNoiseAPI) Generate(ctx context.Context, req GenerateRequest, opts ...clientx.RequestOption) (*Generate, error) {
+	if err := req.Validate(); err != nil {
 		return nil, err
 	}
 
-	return clientx.NewRequestBuilder[GenerateParams, Generate](api.API).
+	return clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
 		Get("/noise.php", opts...).
-		WithQueryParams("query", param).
-		AfterResponse(func(resp *http.Response, noise *Generate) error {
-			fmt.Fprintf(os.Stdout, "Auth: %s\n", resp.Request.Header.Get("Authorization"))
-			return nil
-		}).
+		WithQueryParams("url", req).
 		Do(ctx)
 }
 
@@ -125,7 +120,7 @@ func main() {
 		),
 	}
 
-	_, err := api.Generate(context.TODO(), GenerateParams{
+	resp, err := api.Generate(context.TODO(), GenerateRequest{
 		R:           generate(0, 255),
 		G:           generate(0, 255),
 		B:           generate(0, 255),
@@ -139,4 +134,5 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	fmt.Println("Image URI", resp.URI)
 }
