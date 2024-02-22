@@ -14,6 +14,13 @@ import (
 
 var ErrRateLimitExceeded = errors.New("rate limit is exceeded")
 
+// Limiter is a general interface responsible for rate-limiting functional.
+type Limiter interface {
+	Wait(ctx context.Context) error
+	SetBurstAt(at time.Time, burst int)
+	SetLimitAt(at time.Time, limit rate.Limit)
+}
+
 // This bucket implementation is wrapper around rate.Limiter.
 //
 // Using adaptive rate-limiting may cause Thundering herd problem, when all clients (in our situation - goroutines)
@@ -25,6 +32,8 @@ type adaptiveBucketLimiter struct {
 	nextResetAt     time.Time
 	nextResetEvents []func()
 }
+
+var _ Limiter = (*adaptiveBucketLimiter)(nil)
 
 func newAdaptiveBucketLimiter(limit rate.Limit, burst int) *adaptiveBucketLimiter {
 	return &adaptiveBucketLimiter{

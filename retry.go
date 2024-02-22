@@ -18,7 +18,7 @@ type RetryCond func(resp *http.Response, err error) bool
 // Returns duration that mechanism have to wait before making a request.
 type RetryFunc func(n int, min, max time.Duration) time.Duration
 
-// Retrier defines general interface for custom retry algo implementations.
+// Retrier is a general interface for custom retry algo implementations.
 type Retrier interface {
 	Next() time.Duration
 	Reset() int64
@@ -34,6 +34,8 @@ type backoff struct {
 	attempts    int64
 	f           RetryFunc
 }
+
+var _ Retrier = (*backoff)(nil)
 
 const stopBackoff time.Duration = -1
 

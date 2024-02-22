@@ -1,6 +1,8 @@
 // Copyright (c) 2024 0x9ef. All rights reserved.
 // Use of this source code is governed by an MIT license
 // that can be found in the LICENSE file.
+//
+// Package clientx provides functions to build and maintain your own HTTP client.
 package clientx
 
 import (
@@ -19,7 +21,7 @@ type API struct {
 	httpClient *http.Client
 	options    *Options
 	retry      Retrier
-	limiter    *adaptiveBucketLimiter
+	limiter    Limiter
 }
 
 type (
@@ -27,6 +29,7 @@ type (
 	Options struct {
 		BaseURL    string
 		HttpClient *http.Client
+		Headers    http.Header
 		// Debug prints responses into os.Stdout.
 		Debug bool
 		// RateLimitParseFn is a custom function that parses rate limits from HTTP response.
@@ -135,5 +138,25 @@ func WithRateLimit(limit int, burst int, per time.Duration) Option {
 			Burst: burst,
 			Per:   per,
 		}
+	}
+}
+
+// WithHeader sets global header. Overwrites values related to key.
+func WithHeader(key string, value string) Option {
+	return func(o *Options) {
+		if len(o.Headers) == 0 {
+			o.Headers = make(http.Header)
+		}
+		o.Headers[key] = []string{value}
+	}
+}
+
+// WithHeaderSet sets global headers. Overwrites previously defined header set.
+func WithHeaderSet(headers map[string][]string) Option {
+	return func(o *Options) {
+		if len(o.Headers) == 0 {
+			o.Headers = make(http.Header)
+		}
+		o.Headers = headers
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"time"
 
@@ -19,16 +20,18 @@ type PHPNoiseAPI struct {
 
 type (
 	GenerateParams struct {
-		R           int    `query:"r"`
-		G           int    `query:"g"`
-		B           int    `query:"b"`
-		Tiles       int    `query:"titles"`
-		TileSize    int    `query:"tileSize"`
-		BorderWidth int    `query:"borderWidth"`
-		ColorMode   string `query:"colorMode"`
-		JSON        int    `query:"json"`
-		Base64      int    `query:"base64"`
+		R           int       `query:"r"`
+		G           int       `query:"g"`
+		B           int       `query:"b"`
+		Tiles       int       `query:"titles"`
+		TileSize    int       `query:"tileSize"`
+		BorderWidth int       `query:"borderWidth"`
+		ColorMode   ColorMode `query:"colorMode"`
+		JSON        int       `query:"json"`
+		Base64      int       `query:"base64"`
 	}
+
+	ColorMode string
 
 	Generate struct {
 		Url    string `json:"url"`
@@ -37,9 +40,13 @@ type (
 )
 
 const (
-	ColorModeBrigthness = "brightness"
-	ColorModeAround     = "around"
+	ColorModeBrigthness ColorMode = "brightness"
+	ColorModeAround     ColorMode = "around"
 )
+
+func (mode ColorMode) String() string {
+	return string(mode)
+}
 
 // You may use go-validator package to validate through struct fields instead of custom validate function.
 func (r *GenerateParams) Validate() error {
@@ -79,17 +86,21 @@ func (r GenerateParams) Encode(v url.Values) error {
 		v.Set("tileSize", strconv.Itoa(r.TileSize))
 	}
 	if r.ColorMode != "" {
-		v.Set("mode", r.ColorMode)
+		v.Set("mode", r.ColorMode.String())
 	}
 	return nil
 }
 
 func (api *PHPNoiseAPI) Generate(ctx context.Context, param GenerateParams, opts ...clientx.RequestOption) (*Generate, error) {
+	if err := param.Validate(); err != nil {
+		return nil, err
+	}
+
 	return clientx.NewRequestBuilder[GenerateParams, Generate](api.API).
 		Get("/noise.php", opts...).
 		WithQueryParams("query", param).
 		AfterResponse(func(resp *http.Response, noise *Generate) error {
-			fmt.Println("Base64", noise.Base64)
+			fmt.Fprintf(os.Stdout, "Auth: %s\n", resp.Request.Header.Get("Authorization"))
 			return nil
 		}).
 		Do(ctx)
@@ -104,6 +115,7 @@ func main() {
 	api := &PHPNoiseAPI{
 		API: clientx.NewAPI(
 			clientx.WithBaseURL("https://php-noise.com"),
+			clientx.WithHeader("Authorization", "Bearer MY_ACCESS_TOKEN"),
 			clientx.WithRateLimit(10, 2, time.Minute),
 			clientx.WithRetry(10, time.Second*3, time.Minute, clientx.ExponentalBackoff,
 				func(resp *http.Response, err error) bool {
@@ -113,21 +125,18 @@ func main() {
 		),
 	}
 
-	for i := 0; i < 10; i++ {
-		_, err := api.Generate(context.TODO(), GenerateParams{
-			R:           generate(0, 255),
-			G:           generate(0, 255),
-			B:           generate(0, 255),
-			Tiles:       10,
-			TileSize:    15,
-			BorderWidth: 5,
-			ColorMode:   ColorModeBrigthness,
-			JSON:        1,
-			Base64:      1,
-		})
-		if err != nil {
-			panic(err)
-		}
+	_, err := api.Generate(context.TODO(), GenerateParams{
+		R:           generate(0, 255),
+		G:           generate(0, 255),
+		B:           generate(0, 255),
+		Tiles:       10,
+		TileSize:    15,
+		BorderWidth: 5,
+		ColorMode:   ColorModeBrigthness,
+		JSON:        1,
+		Base64:      1,
+	})
+	if err != nil {
+		panic(err)
 	}
-
 }

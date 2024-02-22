@@ -57,13 +57,13 @@ func (r *RequestBuilder[Req, Resp]) WithForm(obj url.Values) *RequestBuilder[Req
 
 // WithQueryParams sets URL query parameters from structure by accesing field with provided tag alias.
 func (r *RequestBuilder[Req, Resp]) WithQueryParams(tag string, params ...Req) *RequestBuilder[Req, Resp] {
-	r.requestOptions = append(r.requestOptions, WithRequestParams(tag, params...))
+	r.requestOptions = append(r.requestOptions, WithRequestQueryParams(tag, params...))
 	return r
 }
 
 // WithEncodableQueryParams sets URL query parameters from structure which implements ParamEncoder interface.
 func (r *RequestBuilder[Req, Resp]) WithEncodableQueryParams(params ...ParamEncoder[Req]) *RequestBuilder[Req, Resp] {
-	r.requestOptions = append(r.requestOptions, WithRequestEncodableParams(params...))
+	r.requestOptions = append(r.requestOptions, WithRequestQueryEncodableParams(params...))
 	return r
 }
 

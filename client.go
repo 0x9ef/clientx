@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -25,7 +26,13 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 		return nil, nil, err
 	}
 
-	resp, err := c.makeRequest(ctx, req)
+	// Create HTTP request and apply beforeResponse chain
+	httpReq, err := c.makeRequest(ctx, req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	resp, err := c.performRequest(ctx, httpReq, req)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -44,37 +51,40 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 	return resp, &data, nil
 }
 
-func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder[Req, Resp]) (*http.Response, error) {
+func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder[Req, Resp]) (*http.Request, error) {
 	u, err := c.buildRequestURL(req.resourcePath)
 	if err != nil {
 		return nil, err
 	}
 
-	r, err := http.NewRequestWithContext(ctx, req.method, u.String(), nil)
+	httpReq, err := http.NewRequestWithContext(ctx, req.method, u.String(), nil)
 	if err != nil {
 		return nil, err
 	}
 	// If method is not GET, try to set payload body
 	if req.method != http.MethodGet && req.body != nil {
-		r.Body, err = req.encodeRequestPayload()
+		httpReq.Body, err = req.encodeRequestPayload()
 		if err != nil {
 			return nil, err
 		}
 	}
+	if len(c.api.options.Headers) != 0 {
+		httpReq.Header = c.api.options.Headers
+	}
 
 	// Apply options to request
-	for _, o := range req.requestOptions {
-		if err := o(r); err != nil {
+	for _, opt := range req.requestOptions {
+		if err := opt(httpReq); err != nil {
 			return nil, err
 		}
 	}
 
+	return httpReq, nil
+}
+
+func (c *client[Req, Resp]) performRequest(ctx context.Context, httpReq *http.Request, req *RequestBuilder[Req, Resp]) (*http.Response, error) {
 	do := func(c *client[Req, Resp], req *http.Request, reuse bool) (*http.Response, error) {
 		if reuse && req.Body != nil {
-			// In a way when we use retry functionality we have to copy
-			// request and pass it to c.httpDoer.Do, but req.Clone() doesn't really deep clone Body
-			// and we have to clone body manually as in httputil.DumpRequestOut
-			//
 			// Issue https://github.com/golang/go/issues/36095
 			var b bytes.Buffer
 			b.ReadFrom(req.Body)
@@ -95,17 +105,17 @@ func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder
 			if err != nil {
 				return nil, err
 			}
-			fmt.Printf("RESPONSE:\n%s\n", string(b))
+			fmt.Fprintf(os.Stdout, "RESPONSE:\n%s\n", string(b))
 		}
 		return resp, nil
 	}
 	if c.api.retry == nil {
 		// Do single request without using backoff retry mechanism
-		return do(c, r, false)
+		return do(c, httpReq, false)
 	}
 
 	for {
-		resp, err := do(c, r, true)
+		resp, err := do(c, httpReq, true)
 
 		var isMatchedCond bool
 		for _, cond := range c.api.options.Retry.Conditions {

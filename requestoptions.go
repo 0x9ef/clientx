@@ -15,8 +15,8 @@ import (
 
 type RequestOption func(req *http.Request) error
 
-// WithRequestParams encodes params automatically by accesing fields with custom tag.
-func WithRequestParams[T any](tag string, params ...T) RequestOption {
+// WithRequestQueryParams encodes query params automatically by accesing fields with custom tag.
+func WithRequestQueryParams[T any](tag string, params ...T) RequestOption {
 	return func(req *http.Request) error {
 		q := req.URL.Query()
 		enc := schema.NewEncoder()
@@ -32,9 +32,9 @@ func WithRequestParams[T any](tag string, params ...T) RequestOption {
 	}
 }
 
-// WithRequestEncodableParams encodes params by implementing ParamEncoder[T] interface,
+// WithRequestQueryEncodableParams encodes query params by implementing ParamEncoder[T] interface,
 // calls Encode(url.Values) functional to set query params.
-func WithRequestEncodableParams[T any](params ...ParamEncoder[T]) RequestOption {
+func WithRequestQueryEncodableParams[T any](params ...ParamEncoder[T]) RequestOption {
 	return func(req *http.Request) error {
 		q := req.URL.Query()
 		for _, param := range params {
