@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -20,10 +19,14 @@ func responseReader(resp *http.Response) (io.ReadCloser, error) {
 	var err error
 	var reader io.ReadCloser
 	switch resp.Header.Get("Content-Encoding") {
+	case "deflate":
+		reader = io.NopCloser(flate.NewReader(resp.Body))
 	case "gzip":
 		reader, err = gzip.NewReader(resp.Body)
-	case "deflate":
-		reader = flate.NewReader(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+		reader = io.NopCloser(reader)
 	default:
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
@@ -34,13 +37,13 @@ func responseReader(resp *http.Response) (io.ReadCloser, error) {
 	return reader, err
 }
 
-func decodeResponse[T any](resp *http.Response, v T) error {
+func decodeResponse[T any](enc EncoderDecoder, resp *http.Response, dst T) error {
 	reader, err := responseReader(resp)
 	if err != nil {
 		return fmt.Errorf("decode response failed: %w", err)
 	}
 	defer reader.Close()
 
-	err = json.NewDecoder(reader).Decode(v)
+	err = enc.Decode(reader, dst)
 	return err
 }

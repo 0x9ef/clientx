@@ -6,7 +6,7 @@ package clientx
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -32,9 +32,9 @@ type RequestBuilder[Req any, Resp any] struct {
 	body           *Req
 }
 
-func (rb *RequestBuilder[Req, Resp]) encodeRequestPayload() (io.ReadCloser, error) {
+func (rb *RequestBuilder[Req, Resp]) encodeRequestPayload(enc EncoderDecoder) (io.ReadCloser, error) {
 	payload := &bytes.Buffer{}
-	if err := json.NewEncoder(payload).Encode(rb.body); err != nil {
+	if err := enc.Encode(payload, rb.body); err != nil {
 		return nil, err
 	}
 	return io.NopCloser(payload), nil
@@ -153,12 +153,17 @@ func (rb *RequestBuilder[Req, Resp]) Connect(path string, opts ...RequestOption)
 
 // Do executes request and returns *http.Response. Returns error if any.
 func (rb *RequestBuilder[Req, Resp]) Do(ctx context.Context) (*http.Response, error) {
-	resp, _, err := rb.client.do(ctx, rb, false)
+	resp, _, err := rb.client.do(ctx, rb, false, JSONEncoderDecoder)
 	return resp, err
 }
 
 // DoWithDecode executes request and decodes response into Resp object. Returns error if any.
-func (rb *RequestBuilder[Req, Resp]) DoWithDecode(ctx context.Context) (*Resp, error) {
-	_, decoded, err := rb.client.do(ctx, rb, true)
+func (rb *RequestBuilder[Req, Resp]) DoWithDecode(ctx context.Context, enc ...EncoderDecoder) (*Resp, error) {
+	if len(enc) == 0 {
+		enc = append(enc, JSONEncoderDecoder) // JSON by default
+	} else if len(enc) > 1 {
+		return nil, errors.New("enc length should be 0 or 1")
+	}
+	_, decoded, err := rb.client.do(ctx, rb, true, enc[0])
 	return decoded, err
 }

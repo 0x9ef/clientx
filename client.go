@@ -20,14 +20,14 @@ type client[Req any, Resp any] struct {
 	afterResponse []func(resp *http.Response, data *Resp) error
 }
 
-func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Resp], decode bool) (*http.Response, *Resp, error) {
+func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Resp], decode bool, enc EncoderDecoder) (*http.Response, *Resp, error) {
 	// Wait for ratelimits. It is a blocking call.
 	if err := c.api.limiter.Wait(ctx); err != nil {
 		return nil, nil, err
 	}
 
 	// Create HTTP request and apply beforeResponse chain
-	httpReq, err := c.makeRequest(ctx, req)
+	httpReq, err := c.makeRequest(ctx, req, enc)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -38,8 +38,8 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 	}
 
 	var data Resp
-	if decode {
-		if err := decodeResponse(resp, &data); err != nil {
+	if decode && enc != nil {
+		if err := decodeResponse(enc, resp, &data); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -53,7 +53,7 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 	return resp, &data, nil
 }
 
-func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder[Req, Resp]) (*http.Request, error) {
+func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder[Req, Resp], enc EncoderDecoder) (*http.Request, error) {
 	u, err := c.buildRequestURL(req.resourcePath)
 	if err != nil {
 		return nil, err
@@ -64,8 +64,8 @@ func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder
 		return nil, err
 	}
 	// If method is not GET, try to set payload body
-	if req.method != http.MethodGet && req.body != nil {
-		httpReq.Body, err = req.encodeRequestPayload()
+	if req.method != http.MethodGet && req.body != nil && enc != nil {
+		httpReq.Body, err = req.encodeRequestPayload(enc)
 		if err != nil {
 			return nil, err
 		}
