@@ -37,19 +37,19 @@ There is no separate flow for authorization, but it can be done with HTTP header
 ```go
 // GetOffer accepts offerId and request options that will be applied before request is sent.
 func (api *MyAPI) GetOffer(ctx context.Context, offerId string, opts ...clientx.RequestOption) (*Offer, error) {
-    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+	return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
 		DoWithDecode(ctx)
 }
 
 func main() {
-    ... 
-    ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	... 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	
-    resp, err := api.GetOffer(ctx, "off_1234", clientx.WithRequestHeaders(map[string][]string{
-        "Authorization":    []string{"Bearer MY_ACCESS_TOKEN"}, 
-    }))
+	resp, err := api.GetOffer(ctx, "off_1234", clientx.WithRequestHeaders(map[string][]string{
+		"Authorization": []string{"Bearer MY_ACCESS_TOKEN"}, 
+	}))
 }
 ```
 
@@ -94,8 +94,8 @@ api := New(
 	clientx.NewAPI(
 		clientx.WithBaseURL("https://php-noise.com"),
 		clientx.WithRateLimit(10, 2, time.Minute), 
-        // Parameters: max retry attempts, minimal wait time, maximal wait time, retry function (you could provide your own which is suitable for clientx.RetryFunc), trigger function (in our example we consider all 429 statuses as a tigger)
-        clientx.WithRetry(10, time.Second*3, time.Minute, clientx.ExponentalBackoff,
+		// Parameters: max retry attempts, minimal wait time, maximal wait time, retry function (you could provide your own which is suitable for clientx.RetryFunc), trigger function (in our example we consider all 429 statuses as a tigger)
+		clientx.WithRetry(10, time.Second*3, time.Minute, clientx.ExponentalBackoff,
 			func(resp *http.Response, err error) bool {
 				return resp.StatusCode == http.StatusTooManyRequests
 			},
@@ -109,20 +109,20 @@ You can add custom headers to request or set query parameters, form data, etc...
 
 ```go
 func (api *MyAPI) GetOffer(ctx context.Context, offerId string, opts ...clientx.RequestOption) (*Offer, error) {
-    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+	return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
 		DoWithDecode(ctx)
 }
 
 func main() {
     ... 
-    ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-    resp, err := api.GetOffer(ctx, "off_1234", clientx.WithRequestHeaders(map[string][]string{
-        "Authorization":    []string{"Bearer token_test"}, 
-        "X-Correlation-Id": []string{"mdj34fjhgsdb4"},
-    }))
+	resp, err := api.GetOffer(ctx, "off_1234", clientx.WithRequestHeaders(map[string][]string{
+		"Authorization":    []string{"Bearer token_test"}, 
+		"X-Correlation-Id": []string{"mdj34fjhgsdb4"},
+	}))
 }
 ```
 
@@ -131,40 +131,40 @@ There are two ways to encode query parameters, one can be preferred rather than 
 
 ```go
 type GetOfferParams struct {
-    FilterBy string `url:"filter_by"`
+	FilterBy string `url:"filter_by"`
 }
 
 func (param GetOfferParam) Encode(v url.Values) error {
-    v.Set("filter_by", param.FilterBy)
-    return nil
+	v.Set("filter_by", param.FilterBy)
+	return nil
 }
 
 
 // Variant based on WithQueryParams (when we want to encode through structure tags) 
 func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params GetOfferParams, opts ...clientx.RequestOption) (*Offer, error) {
-    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+	return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
-        WithQueryParams("url", params).
+		WithQueryParams("url", params).
 		DoWithDecode(ctx)
 }
 
 // Variant based on WithEncodableQueryParams when we implement clientx.ParamEncoder interface
 func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params GetOfferParams, opts ...clientx.RequestOption) (*Offer, error) {
-    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+	return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
-        WithEncodableQueryParams(params).
+		WithEncodableQueryParams(params).
 		DoWithDecode(ctx)
 }
 ```
 
-### Custom encoding/decoding 
+### Custom encoding & decoding 
 By default, ClientX uses JSON encoder if not specified. If you want to encode/decode payload and responses in XML or any other formats, you should implement `clientx.EncoderDecoder` and pass it as a second argument into `DoWithDecode` function.
 
 ```go
 func (api *MyAPI) CreateOffer(ctx context.Context, offerId string, body GetOfferParams, opts ...clientx.RequestOption) (*Offer, error) {
-    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+	return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Post("/offers/"+offerId, &body, opts...).
-        WithEncodableQueryParams(params).
+ 		WithEncodableQueryParams(params).
 		DoWithDecode(ctx, clientx.XMLEncoderDecoder) // selected XML encoder
 }
 ```
