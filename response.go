@@ -13,6 +13,9 @@ import (
 	"net/http"
 )
 
+// Empty is an empty payload for request/response decoding.
+type Empty struct{}
+
 func responseReader(resp *http.Response) (io.ReadCloser, error) {
 	var err error
 	var reader io.ReadCloser

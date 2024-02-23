@@ -116,8 +116,8 @@ func (api *PHPNoiseAPI) Generate(ctx context.Context, req GenerateRequest, opts 
 	}
 
 	resp, err := clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
-		Get("/noise.php", opts...).
-		WithQueryParams("url", req).
+		Get("/noise.php", opts...).  // make GET to /noise.php and apply request options
+		WithQueryParams("url", req). // as far as our GenerateParams structure has "query" tag, we can specify this tag to process
 		AfterResponse(func(resp *http.Response, model *Generate) error {
 			api.mu.Lock()
 			defer api.mu.Unlock()
@@ -134,10 +134,10 @@ func (api *PHPNoiseAPI) GenerateReader(ctx context.Context, req GenerateRequest,
 		return nil, err
 	}
 
-	resp, err := clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
+	resp, err := clientx.NewRequestBuilder[GenerateRequest, struct{}](api.API).
 		Get("/noise.php", opts...).
 		WithEncodableQueryParams(req).
-		AfterResponse(func(resp *http.Response, _ *Generate) error {
+		AfterResponse(func(resp *http.Response, model *struct{}) error {
 			api.mu.Lock()
 			defer api.mu.Unlock()
 			size, err := strconv.Atoi(resp.Header.Get("Content-Length")) // don't do like that, because Content-Length could be fake
