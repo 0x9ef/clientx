@@ -36,6 +36,12 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 	if err != nil {
 		return nil, nil, err
 	}
+	if req.errDecodeFn != nil {
+		ok, err := req.errDecodeFn(resp)
+		if ok {
+			return resp, nil, err
+		}
+	}
 
 	var data Resp
 	if decode && enc != nil {

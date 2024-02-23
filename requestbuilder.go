@@ -30,6 +30,7 @@ type RequestBuilder[Req any, Resp any] struct {
 	resourcePath   string
 	requestOptions []RequestOption
 	body           *Req
+	errDecodeFn    func(*http.Response) (bool, error)
 }
 
 func (rb *RequestBuilder[Req, Resp]) encodeRequestPayload(enc EncoderDecoder) (io.ReadCloser, error) {
@@ -64,6 +65,12 @@ func (rb *RequestBuilder[Req, Resp]) WithQueryParams(tag string, params ...Req) 
 // WithEncodableQueryParams sets URL query parameters from structure which implements ParamEncoder interface.
 func (rb *RequestBuilder[Req, Resp]) WithEncodableQueryParams(params ...ParamEncoder[Req]) *RequestBuilder[Req, Resp] {
 	rb.requestOptions = append(rb.requestOptions, WithRequestQueryEncodableParams(params...))
+	return rb
+}
+
+// WithErrorDecode sets custom error decoding function. Will be executed immediately after request is performed.
+func (rb *RequestBuilder[Req, Resp]) WithErrorDecode(f func(resp *http.Response) (bool, error)) *RequestBuilder[Req, Resp] {
+	rb.errDecodeFn = f
 	return rb
 }
 
