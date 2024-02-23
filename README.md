@@ -39,7 +39,7 @@ There is no separate flow for authorization, but it can be done with HTTP header
 func (api *MyAPI) GetOffer(ctx context.Context, offerId string, opts ...clientx.RequestOption) (*Offer, error) {
     return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
-		Do(ctx)
+		DoWithDecode(ctx)
 }
 
 func main() {
@@ -111,7 +111,7 @@ You can add custom headers to request or set query parameters, form data, etc...
 func (api *MyAPI) GetOffer(ctx context.Context, offerId string, opts ...clientx.RequestOption) (*Offer, error) {
     return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
-		Do(ctx)
+		DoWithDecode(ctx)
 }
 
 func main() {
@@ -145,7 +145,7 @@ func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params GetOfferP
     return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
         WithQueryParams("url", params).
-		Do(ctx)
+		DoWithDecode(ctx)
 }
 
 // Variant based on WithEncodableQueryParams when we implement clientx.ParamEncoder interface
@@ -153,9 +153,26 @@ func (api *MyAPI) GetOffer(ctx context.Context, offerId string, params GetOfferP
     return clientx.NewRequestBuilder[struct{}, Offer](api.API).
 		Get("/offers/"+offerId, opts...).
         WithEncodableQueryParams(params).
-		Do(ctx)
+		DoWithDecode(ctx)
 }
 ```
+
+### Custom encoding/decoding 
+By default, ClientX uses JSON encoder if not specified. If you want to encode/decode payload and responses in XML or any other formats, you should implement `clientx.EncoderDecoder` and pass it as a second argument into `DoWithDecode` function.
+
+```go
+func (api *MyAPI) CreateOffer(ctx context.Context, offerId string, body GetOfferParams, opts ...clientx.RequestOption) (*Offer, error) {
+    return clientx.NewRequestBuilder[struct{}, Offer](api.API).
+		Post("/offers/"+offerId, &body, opts...).
+        WithEncodableQueryParams(params).
+		DoWithDecode(ctx, clientx.XMLEncoderDecoder) // selected XML encoder
+}
+```
+
+**Encoders supported from the box**:
+- JSON
+- XML
+- Blank (No actions, no errors)
 
 ## Contributing
 If you found a bug or have an idea for a new feature, please first discuss it with us by [submitting a new issue](https://github.com/0x9ef/clientx/issues). 
