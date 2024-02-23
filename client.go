@@ -36,6 +36,10 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 	if err != nil {
 		return nil, nil, err
 	}
+	r, err := responseReader(resp)
+	if err != nil {
+		return nil, nil, err
+	}
 	if req.errDecodeFn != nil {
 		ok, err := req.errDecodeFn(resp)
 		if ok {
@@ -45,7 +49,7 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 
 	var data Resp
 	if decode && enc != nil {
-		if err := decodeResponse(enc, resp, &data); err != nil {
+		if err := decodeResponse(enc, r, &data); err != nil {
 			return nil, nil, err
 		}
 	}

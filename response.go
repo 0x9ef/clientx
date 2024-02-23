@@ -7,7 +7,6 @@ import (
 	"bytes"
 	"compress/flate"
 	"compress/gzip"
-	"fmt"
 	"io"
 	"net/http"
 )
@@ -37,13 +36,6 @@ func responseReader(resp *http.Response) (io.ReadCloser, error) {
 	return reader, err
 }
 
-func decodeResponse[T any](enc EncoderDecoder, resp *http.Response, dst T) error {
-	reader, err := responseReader(resp)
-	if err != nil {
-		return fmt.Errorf("decode response failed: %w", err)
-	}
-	defer reader.Close()
-
-	err = enc.Decode(reader, dst)
-	return err
+func decodeResponse[T any](enc EncoderDecoder, r io.ReadCloser, dst T) error {
+	return enc.Decode(r, dst)
 }
