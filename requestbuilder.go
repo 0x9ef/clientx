@@ -150,7 +150,14 @@ func (rb *RequestBuilder[Req, Resp]) Connect(path string, opts ...RequestOption)
 	return rb
 }
 
-// Do executes request and decodes response into Resp object, returns error if any.
-func (rb *RequestBuilder[Req, Resp]) Do(ctx context.Context) (*Resp, error) {
-	return rb.client.do(ctx, rb)
+// Do executes request and returns *http.Response. Returns error if any.
+func (rb *RequestBuilder[Req, Resp]) Do(ctx context.Context) (*http.Response, error) {
+	resp, _, err := rb.client.do(ctx, rb, false)
+	return resp, err
+}
+
+// DoWithDecode executes request and decodes response into Resp object. Returns error if any.
+func (rb *RequestBuilder[Req, Resp]) DoWithDecode(ctx context.Context) (*Resp, error) {
+	_, decoded, err := rb.client.do(ctx, rb, true)
+	return decoded, err
 }

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"sync"
 	"time"
@@ -16,8 +18,9 @@ import (
 
 type PHPNoiseAPI struct {
 	*clientx.API
-	mu            *sync.Mutex
-	lastUploadURI string
+	mu             *sync.Mutex
+	lastUploadURI  string
+	lastUploadSize int
 }
 
 func New(api *clientx.API) *PHPNoiseAPI {
@@ -98,6 +101,12 @@ func (r GenerateRequest) Encode(v url.Values) error {
 	if r.ColorMode != "" {
 		v.Set("mode", r.ColorMode.String())
 	}
+	if r.JSON != 0 {
+		v.Set("json", "1")
+	}
+	if r.Base64 != 0 {
+		v.Set("base64", "1")
+	}
 	return nil
 }
 
@@ -106,7 +115,7 @@ func (api *PHPNoiseAPI) Generate(ctx context.Context, req GenerateRequest, opts 
 		return nil, err
 	}
 
-	return clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
+	resp, err := clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
 		Get("/noise.php", opts...).
 		WithQueryParams("url", req).
 		AfterResponse(func(resp *http.Response, model *Generate) error {
@@ -115,7 +124,35 @@ func (api *PHPNoiseAPI) Generate(ctx context.Context, req GenerateRequest, opts 
 			api.lastUploadURI = model.URI
 			return nil
 		}).
+		DoWithDecode(ctx)
+
+	return resp, err
+}
+
+func (api *PHPNoiseAPI) GenerateReader(ctx context.Context, req GenerateRequest, opts ...clientx.RequestOption) (io.ReadCloser, error) {
+	if err := req.Validate(); err != nil {
+		return nil, err
+	}
+
+	resp, err := clientx.NewRequestBuilder[GenerateRequest, Generate](api.API).
+		Get("/noise.php", opts...).
+		WithEncodableQueryParams(req).
+		AfterResponse(func(resp *http.Response, _ *Generate) error {
+			api.mu.Lock()
+			defer api.mu.Unlock()
+			size, err := strconv.Atoi(resp.Header.Get("Content-Length")) // don't do like that, because Content-Length could be fake
+			if err != nil {
+				return err
+			}
+			api.lastUploadSize = size
+			return nil
+		}).
 		Do(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Body, nil
 }
 
 func generate(min, max int) int {
@@ -140,6 +177,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
 
+	// Get URI to download and base64 of image
 	resp, err := api.Generate(ctx, GenerateRequest{
 		R:           generate(0, 255),
 		G:           generate(0, 255),
@@ -148,12 +186,37 @@ func main() {
 		TileSize:    15,
 		BorderWidth: 5,
 		ColorMode:   ColorModeBrigthness,
-		JSON:        1,
-		Base64:      1,
+		JSON:        1, // Indicates that our response should be in JSON format
+		Base64:      1, // Indicates that encoding is base64 (only with JSON option)
 	})
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("Current URI:", resp.URI)
 	fmt.Println("LastUploaded URI:", api.lastUploadURI)
+
+	// Directly download PNG and write into file
+	body, err := api.GenerateReader(ctx, GenerateRequest{
+		R:           generate(0, 255),
+		G:           generate(0, 255),
+		B:           generate(0, 255),
+		Tiles:       10,
+		TileSize:    15,
+		BorderWidth: 5,
+		ColorMode:   ColorModeBrigthness,
+		// JSON=0, BASE64=0
+	})
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("LastUploaded Size:", api.lastUploadSize)
+	defer body.Close()
+
+	png, err := os.Create("noise.png")
+	if err != nil {
+		panic(err)
+	}
+	if _, err := io.Copy(png, body); err != nil {
+		panic(err)
+	}
 }

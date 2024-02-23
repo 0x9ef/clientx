@@ -30,7 +30,7 @@ type (
 func (api *CatFactAPI) GetFact(ctx context.Context, opts ...clientx.RequestOption) (*Fact, error) {
 	return clientx.NewRequestBuilder[EmptyRequest, Fact](api.API).
 		Get("/fact", opts...).
-		Do(ctx)
+		DoWithDecode(ctx)
 }
 
 func main() {

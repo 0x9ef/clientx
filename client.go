@@ -20,35 +20,37 @@ type client[Req any, Resp any] struct {
 	afterResponse []func(resp *http.Response, data *Resp) error
 }
 
-func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Resp]) (*Resp, error) {
+func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Resp], decode bool) (*http.Response, *Resp, error) {
 	// Wait for ratelimits. It is a blocking call.
 	if err := c.api.limiter.Wait(ctx); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// Create HTTP request and apply beforeResponse chain
 	httpReq, err := c.makeRequest(ctx, req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	resp, err := c.performRequest(ctx, httpReq, req)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var data Resp
-	if err := decodeResponse(resp, &data); err != nil {
-		return nil, err
+	if decode {
+		if err := decodeResponse(resp, &data); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	for _, after := range c.afterResponse {
 		if err := after(resp, &data); err != nil {
-			return nil, fmt.Errorf("after response exec failed: %w", err)
+			return nil, nil, fmt.Errorf("after response exec failed: %w", err)
 		}
 	}
 
-	return &data, nil
+	return resp, &data, nil
 }
 
 func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder[Req, Resp]) (*http.Request, error) {
