@@ -15,7 +15,8 @@ go get github.com/0x9ef/clientx@1.24.4 # version
 ```
 
 ## Usage examples
-See the [examples/](https://github.com/0x9ef/clientx/blob/master/examples) folder (CatFacts, PHPNoise APIs)
+* Check out the ready-to-use [HotelBeds Client](https://github.com/0x9ef/hotelbeds-go) built with ClientX
+* See the [examples/](https://github.com/0x9ef/clientx/blob/master/examples) folder (CatFacts, PHPNoise APIs)
 
 ## Getting Started
 The first thing you need to understand: it will be easy :)
