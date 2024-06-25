@@ -17,7 +17,7 @@ import (
 
 type client[Req any, Resp any] struct {
 	api           *API
-	afterResponse []func(resp *http.Response, data *Resp) error
+	afterResponse []func(resp *http.Response) error
 }
 
 func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Resp], decode bool, enc EncoderDecoder) (*http.Response, *Resp, error) {
@@ -36,10 +36,18 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 	if err != nil {
 		return nil, nil, err
 	}
-	r, err := responseReader(resp)
+
+	nopCloseReader, err := responseReader(resp)
 	if err != nil {
 		return nil, nil, err
 	}
+
+	for _, after := range c.afterResponse {
+		if err := after(resp); err != nil {
+			return nil, nil, fmt.Errorf("after response exec failed: %w", err)
+		}
+	}
+
 	if req.errDecodeFn != nil {
 		ok, err := req.errDecodeFn(resp)
 		if ok {
@@ -49,14 +57,8 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 
 	var data Resp
 	if decode && enc != nil {
-		if err := decodeResponse(enc, r, &data); err != nil {
+		if err := decodeResponse(enc, nopCloseReader, &data); err != nil {
 			return nil, nil, err
-		}
-	}
-
-	for _, after := range c.afterResponse {
-		if err := after(resp, &data); err != nil {
-			return nil, nil, fmt.Errorf("after response exec failed: %w", err)
 		}
 	}
 

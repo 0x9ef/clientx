@@ -15,27 +15,60 @@ import (
 type Empty struct{}
 
 func responseReader(resp *http.Response) (io.ReadCloser, error) {
-	var err error
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	resp.Body = ReusableReader(bytes.NewReader(data))
+
 	var reader io.ReadCloser
 	switch resp.Header.Get("Content-Encoding") {
 	case "deflate":
-		reader = io.NopCloser(flate.NewReader(resp.Body))
+		reader = flate.NewReader(resp.Body)
 	case "gzip":
 		reader, err = gzip.NewReader(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		reader = io.NopCloser(reader)
 	default:
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-		reader, resp.Body = io.NopCloser(bytes.NewBuffer(body)), io.NopCloser(bytes.NewBuffer(body))
+		reader = resp.Body
 	}
+
 	return reader, err
 }
 
 func decodeResponse[T any](enc EncoderDecoder, r io.ReadCloser, dst T) error {
 	return enc.Decode(r, dst)
+}
+
+type reusableReader struct {
+	io.Reader
+	readBuf *bytes.Buffer
+	backBuf *bytes.Buffer
+}
+
+// https://blog.flexicondev.com/read-go-http-request-body-multiple-times
+func ReusableReader(r io.Reader) io.ReadCloser {
+	readBuf := bytes.Buffer{}
+	readBuf.ReadFrom(r) // error handling ignored for brevity
+	backBuf := bytes.Buffer{}
+
+	return reusableReader{
+		io.TeeReader(&readBuf, &backBuf),
+		&readBuf,
+		&backBuf,
+	}
+}
+
+func (r reusableReader) Read(p []byte) (int, error) {
+	n, err := r.Reader.Read(p)
+	if err == io.EOF {
+		r.reset()
+	}
+	return n, err
+}
+
+func (r reusableReader) Close() error {
+	return nil
+}
+
+func (r reusableReader) reset() {
+	io.Copy(r.readBuf, r.backBuf) // nolint: errcheck
 }

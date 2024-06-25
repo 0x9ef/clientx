@@ -56,8 +56,8 @@ func (rb *RequestBuilder[Req, Resp]) WithForm(obj url.Values) *RequestBuilder[Re
 	return rb
 }
 
-// WithQueryParams sets URL query parameters from structure by accesing field with provided tag alias.
-func (rb *RequestBuilder[Req, Resp]) WithQueryParams(tag string, params ...Req) *RequestBuilder[Req, Resp] {
+// WithStructQueryParams sets URL query parameters from structure by accesing field with provided tag alias.
+func (rb *RequestBuilder[Req, Resp]) WithStructQueryParams(tag string, params ...Req) *RequestBuilder[Req, Resp] {
 	rb.requestOptions = append(rb.requestOptions, WithRequestQueryParams(tag, params...))
 	return rb
 }
@@ -76,7 +76,7 @@ func (rb *RequestBuilder[Req, Resp]) WithErrorDecode(f func(resp *http.Response)
 
 // AfterResponse adds to a chain function that will be executed after response is obtained.
 // Note! The second argument (decoded) in f function is only available when using DoWithDecode method to perform request.
-func (rb *RequestBuilder[Req, Resp]) AfterResponse(f func(resp *http.Response, decoded *Resp) error) *RequestBuilder[Req, Resp] {
+func (rb *RequestBuilder[Req, Resp]) AfterResponse(f func(resp *http.Response) error) *RequestBuilder[Req, Resp] {
 	rb.client.afterResponse = append(rb.client.afterResponse, f)
 	return rb
 }
