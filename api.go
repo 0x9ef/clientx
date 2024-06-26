@@ -141,18 +141,8 @@ func WithRateLimit(limit int, burst int, per time.Duration) Option {
 	}
 }
 
-// WithHeader sets global header. Overwrites values related to key.
-func WithHeader(key string, value string) Option {
-	return func(o *Options) {
-		if len(o.Headers) == 0 {
-			o.Headers = make(http.Header)
-		}
-		o.Headers[key] = []string{value}
-	}
-}
-
-// WithHeaderSet sets global headers. Overwrites previously defined header set.
-func WithHeaderSet(headers map[string][]string) Option {
+// WithHeaders sets global headers. Overwrites previously defined header set.
+func WithHeaders(headers map[string][]string) Option {
 	return func(o *Options) {
 		if len(o.Headers) == 0 {
 			o.Headers = make(http.Header)

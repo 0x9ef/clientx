@@ -56,7 +56,9 @@ func WithRequestForm(form url.Values) RequestOption {
 
 func WithRequestHeaders(headers map[string][]string) RequestOption {
 	return func(req *http.Request) error {
-		req.Header = headers
+		for key, val := range headers {
+			req.Header[key] = val
+		}
 		return nil
 	}
 }
