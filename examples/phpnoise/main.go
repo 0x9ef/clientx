@@ -165,7 +165,6 @@ func main() {
 	api := New(
 		clientx.NewAPI(
 			clientx.WithBaseURL("https://php-noise.com"),
-			clientx.WithHeader("Authorization", "Bearer MY_ACCESS_TOKEN"),
 			clientx.WithRateLimit(10, 2, time.Minute),
 			clientx.WithRetry(10, time.Second*3, time.Minute, clientx.ExponentalBackoff,
 				func(resp *http.Response, err error) bool {

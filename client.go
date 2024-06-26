@@ -115,11 +115,15 @@ func (c *client[Req, Resp]) performRequest(ctx context.Context, httpReq *http.Re
 		}
 
 		if c.api.options.Debug {
-			b, err := httputil.DumpResponse(resp, true)
+			reqb, err := httputil.DumpRequest(req, true)
 			if err != nil {
 				return nil, err
 			}
-			fmt.Fprintf(os.Stdout, "RESPONSE:\n%s\n", string(b))
+			respb, err := httputil.DumpResponse(resp, true)
+			if err != nil {
+				return nil, err
+			}
+			fmt.Fprintf(os.Stdout, "HttpRequest:\n%s\nHttpResponse:\n%s\n", string(reqb), string(respb))
 		}
 		return resp, nil
 	}
