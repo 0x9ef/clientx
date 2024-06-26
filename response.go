@@ -15,23 +15,41 @@ import (
 type Empty struct{}
 
 func responseReader(resp *http.Response) (io.ReadCloser, error) {
-	data, err := io.ReadAll(resp.Body)
+	// Duplicate response body to two readers,
+	// the r1 we use to replace resp.Body, and r2 to build flate/gzip readers
+	r1, r2, err := drainBody(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	resp.Body = ReusableReader(bytes.NewReader(data))
 
 	var reader io.ReadCloser
 	switch resp.Header.Get("Content-Encoding") {
 	case "deflate":
-		reader = flate.NewReader(resp.Body)
+		reader = flate.NewReader(r2)
 	case "gzip":
-		reader, err = gzip.NewReader(resp.Body)
+		reader, err = gzip.NewReader(r2)
 	default:
-		reader = resp.Body
+		reader = r2
 	}
+	resp.Body = r1
 
 	return reader, err
+}
+
+// from httputil/dump.go drainBody func
+func drainBody(b io.ReadCloser) (r1, r2 io.ReadCloser, err error) {
+	if b == nil || b == http.NoBody {
+		// No copying needed. Preserve the magic sentinel meaning of NoBody.
+		return http.NoBody, http.NoBody, nil
+	}
+	var buf bytes.Buffer
+	if _, err = buf.ReadFrom(b); err != nil {
+		return nil, b, err
+	}
+	if err = b.Close(); err != nil {
+		return nil, b, err
+	}
+	return io.NopCloser(&buf), io.NopCloser(bytes.NewReader(buf.Bytes())), nil
 }
 
 func decodeResponse[T any](enc EncoderDecoder, r io.ReadCloser, dst T) error {

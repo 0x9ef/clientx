@@ -26,46 +26,45 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 		return nil, nil, err
 	}
 
-	// Create HTTP request and apply beforeResponse chain
-	httpReq, err := c.makeRequest(ctx, req, enc)
+	httpReq, err := c.buildRequest(ctx, req, enc)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	resp, err := c.performRequest(ctx, httpReq, req)
+	httpResp, err := c.executeRequest(ctx, httpReq, req)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	nopCloseReader, err := responseReader(resp)
+	nopCloseReader, err := responseReader(httpResp)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	for _, after := range c.afterResponse {
-		if err := after(resp); err != nil {
+		if err := after(httpResp); err != nil {
 			return nil, nil, fmt.Errorf("after response exec failed: %w", err)
 		}
 	}
 
 	if req.errDecodeFn != nil {
-		ok, err := req.errDecodeFn(resp)
+		ok, err := req.errDecodeFn(httpResp)
 		if ok {
-			return resp, nil, err
+			return httpResp, nil, err
 		}
 	}
 
-	var data Resp
+	var decoded Resp
 	if decode && enc != nil {
-		if err := decodeResponse(enc, nopCloseReader, &data); err != nil {
+		if err := decodeResponse(enc, nopCloseReader, &decoded); err != nil {
 			return nil, nil, err
 		}
 	}
 
-	return resp, &data, nil
+	return httpResp, &decoded, nil
 }
 
-func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder[Req, Resp], enc EncoderDecoder) (*http.Request, error) {
+func (c *client[Req, Resp]) buildRequest(ctx context.Context, req *RequestBuilder[Req, Resp], enc EncoderDecoder) (*http.Request, error) {
 	u, err := c.buildRequestURL(req.resourcePath)
 	if err != nil {
 		return nil, err
@@ -96,7 +95,7 @@ func (c *client[Req, Resp]) makeRequest(ctx context.Context, req *RequestBuilder
 	return httpReq, nil
 }
 
-func (c *client[Req, Resp]) performRequest(ctx context.Context, httpReq *http.Request, req *RequestBuilder[Req, Resp]) (*http.Response, error) {
+func (c *client[Req, Resp]) executeRequest(ctx context.Context, httpReq *http.Request, req *RequestBuilder[Req, Resp]) (*http.Response, error) {
 	do := func(c *client[Req, Resp], req *http.Request, reuse bool) (*http.Response, error) {
 		if reuse && req.Body != nil {
 			// Issue https://github.com/golang/go/issues/36095
