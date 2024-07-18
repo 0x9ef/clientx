@@ -138,7 +138,7 @@ func (api *PHPNoiseAPI) GenerateReader(ctx context.Context, req GenerateRequest,
 	resp, err := clientx.NewRequestBuilder[GenerateRequest, struct{}](api.API).
 		Get("/noise.php", opts...).
 		WithEncodableQueryParams(req).
-		AfterResponse(func(resp *http.Response) error {
+		AfterResponse(func(resp *http.Response, _ []byte) error {
 			api.mu.Lock()
 			defer api.mu.Unlock()
 			size, err := strconv.Atoi(resp.Header.Get("Content-Length")) // don't do like that, because Content-Length could be fake

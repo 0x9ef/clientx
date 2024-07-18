@@ -50,6 +50,13 @@ func NewRequestBuilder[Req any, Resp any](api *API) *RequestBuilder[Req, Resp] {
 	}
 }
 
+// AfterResponse adds to a chain function that will be executed after response is obtained.
+// Note! The second argument (decoded) in f function is only available when using DoWithDecode method to perform request.
+func (rb *RequestBuilder[Req, Resp]) AfterResponse(f func(resp *http.Response, body []byte) error) *RequestBuilder[Req, Resp] {
+	rb.client.afterResponse = append(rb.client.afterResponse, f)
+	return rb
+}
+
 // WithForm sets the form data for the request.
 func (rb *RequestBuilder[Req, Resp]) WithForm(obj url.Values) *RequestBuilder[Req, Resp] {
 	rb.requestOptions = append(rb.requestOptions, WithRequestForm(obj))
@@ -71,13 +78,6 @@ func (rb *RequestBuilder[Req, Resp]) WithEncodableQueryParams(params ...ParamEnc
 // WithErrorDecode sets custom error decoding function. Will be executed immediately after request is performed.
 func (rb *RequestBuilder[Req, Resp]) WithErrorDecode(f func(resp *http.Response) (bool, error)) *RequestBuilder[Req, Resp] {
 	rb.errDecodeFn = f
-	return rb
-}
-
-// AfterResponse adds to a chain function that will be executed after response is obtained.
-// Note! The second argument (decoded) in f function is only available when using DoWithDecode method to perform request.
-func (rb *RequestBuilder[Req, Resp]) AfterResponse(f func(resp *http.Response) error) *RequestBuilder[Req, Resp] {
-	rb.client.afterResponse = append(rb.client.afterResponse, f)
 	return rb
 }
 

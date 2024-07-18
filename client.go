@@ -17,7 +17,7 @@ import (
 
 type client[Req any, Resp any] struct {
 	api           *API
-	afterResponse []func(resp *http.Response) error
+	afterResponse []func(resp *http.Response, respBody []byte) error
 }
 
 func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Resp], decode bool, enc EncoderDecoder) (*http.Response, *Resp, error) {
@@ -36,13 +36,13 @@ func (c *client[Req, Resp]) do(ctx context.Context, req *RequestBuilder[Req, Res
 		return nil, nil, err
 	}
 
-	nopCloseReader, err := responseReader(httpResp)
+	nopCloseReader, body, err := responseReader(httpResp)
 	if err != nil {
 		return nil, nil, err
 	}
 
 	for _, after := range c.afterResponse {
-		if err := after(httpResp); err != nil {
+		if err := after(httpResp, body); err != nil {
 			return nil, nil, fmt.Errorf("after response exec failed: %w", err)
 		}
 	}

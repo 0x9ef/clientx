@@ -14,12 +14,12 @@ import (
 // Empty is an empty payload for request/response decoding.
 type Empty struct{}
 
-func responseReader(resp *http.Response) (io.ReadCloser, error) {
+func responseReader(resp *http.Response) (io.ReadCloser, []byte, error) {
 	// Duplicate response body to two readers,
 	// the r1 we use to replace resp.Body, and r2 to build flate/gzip readers
-	r1, r2, err := drainBody(resp.Body)
+	r1, r2, b, err := drainBody(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var reader io.ReadCloser
@@ -33,23 +33,22 @@ func responseReader(resp *http.Response) (io.ReadCloser, error) {
 	}
 	resp.Body = r1
 
-	return reader, err
+	return reader, b, err
 }
 
-// from httputil/dump.go drainBody func
-func drainBody(b io.ReadCloser) (r1, r2 io.ReadCloser, err error) {
-	if b == nil || b == http.NoBody {
+func drainBody(r io.ReadCloser) (r1, r2 io.ReadCloser, b []byte, err error) {
+	if r == nil || r == http.NoBody {
 		// No copying needed. Preserve the magic sentinel meaning of NoBody.
-		return http.NoBody, http.NoBody, nil
+		return http.NoBody, http.NoBody, nil, nil
 	}
 	var buf bytes.Buffer
-	if _, err = buf.ReadFrom(b); err != nil {
-		return nil, b, err
+	if _, err = buf.ReadFrom(r); err != nil {
+		return nil, r, nil, err
 	}
-	if err = b.Close(); err != nil {
-		return nil, b, err
+	if err = r.Close(); err != nil {
+		return nil, r, nil, err
 	}
-	return io.NopCloser(&buf), io.NopCloser(bytes.NewReader(buf.Bytes())), nil
+	return io.NopCloser(&buf), io.NopCloser(bytes.NewReader(buf.Bytes())), buf.Bytes(), nil
 }
 
 func decodeResponse[T any](enc EncoderDecoder, r io.ReadCloser, dst T) error {
