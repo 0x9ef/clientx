@@ -9,6 +9,9 @@ import (
 	"compress/gzip"
 	"io"
 	"net/http"
+
+	"github.com/klauspost/compress/zstd"
+	"github.com/ulikunitz/xz"
 )
 
 // Empty is an empty payload for request/response decoding.
@@ -28,6 +31,18 @@ func responseReader(resp *http.Response) (io.ReadCloser, []byte, error) {
 		reader = flate.NewReader(r2)
 	case "gzip":
 		reader, err = gzip.NewReader(r2)
+	case "zstd":
+		zstdr, err := zstd.NewReader(r2)
+		if err != nil {
+			return nil, nil, err
+		}
+		reader = zstdr.IOReadCloser()
+	case "xz":
+		xzr, err := xz.NewReader(r2)
+		if err != nil {
+			return nil, nil, err
+		}
+		reader = io.NopCloser(xzr)
 	default:
 		reader = r2
 	}
