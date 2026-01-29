@@ -53,5 +53,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+
 	fmt.Printf("Fact (len=%d): %s\n", resp.Length, resp.Fact)
 }

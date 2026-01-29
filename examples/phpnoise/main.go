@@ -157,8 +157,8 @@ func (api *PHPNoiseAPI) GenerateReader(ctx context.Context, req GenerateRequest,
 }
 
 func generate(min, max int) int {
-	rand.Seed(time.Now().Unix())
-	return rand.Intn((max - min) + min)
+	r := rand.New(rand.NewSource(time.Now().Unix()))
+	return r.Intn((max - min) + min)
 }
 
 func main() {
